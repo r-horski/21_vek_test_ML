@@ -1,113 +1,116 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import StratifiedKFold
+import seaborn as sns
+import matplotlib.pyplot as plt
+from lightgbm import LGBMClassifier
 from sklearn.metrics import f1_score
-import lightgbm as lgb
+from sklearn.model_selection import TimeSeriesSplit
+from features import prepare_datasets
 
-# Загрузка данных
-train = pd.read_csv('../data/train.csv')
-test = pd.read_csv('../data/test.csv')
+def train_and_validate(train_feat: pd.DataFrame, n_splits=5):
+    X = train_feat.drop(columns=["id", "y", "sample_weight"], errors="ignore")
+    y = train_feat["y"]
+    sample_weight = train_feat.get("sample_weight", None)
 
-# Генерация признаков
-from features import create_features, add_time_aware_target_encoding
+    tss = TimeSeriesSplit(n_splits=n_splits)
+    scores = []
 
-train_fe = create_features(train)
-test_fe = create_features(test)
+    for fold, (tr_idx, val_idx) in enumerate(tss.split(X)):
+        X_tr, y_tr = X.iloc[tr_idx], y.iloc[tr_idx]
+        X_val, y_val = X.iloc[val_idx], y.iloc[val_idx]
+        w_tr = sample_weight.iloc[tr_idx] if sample_weight is not None else None
 
-# Time-Aware Target Encoding (без утечки из будущего)
-train_enc, test_enc = add_time_aware_target_encoding(
-    train_df=train_fe,
-    test_df=test_fe,
-    cols=['g1', 'g2'],
-    target='y',
-    alpha=10.0
-)
+        model = LGBMClassifier(
+            n_estimators=500,
+            learning_rate=0.05,
+            num_leaves=64,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            class_weight="balanced",
+            random_state=42
+        )
+        model.fit(X_tr, y_tr, sample_weight=w_tr)
+        preds = model.predict(X_val)
+        f1 = f1_score(y_val, preds)
+        scores.append(f1)
+        print(f"📂 Фолд {fold+1}: F1 = {f1:.4f}")
 
-# Финальные признаки
-features = [
-    'relative_date_number',
-    'date_sin', 'date_cos',
-    'x_sum', 'x_nonzero'
-] + [f'x{i}' for i in range(1, 13)] + \
-  ['g1_tenc', 'g2_tenc']
+    print(f"\n✅ Средний F1 по {n_splits} фолдам: {np.mean(scores):.4f}")
+    return model
 
-cat_features = ['g1', 'g2']
 
-# Подготовка признаков
-X_train = train_enc[features + cat_features].copy()
-y_train = train_enc['y']
-X_test = test_enc[features + cat_features].copy()
 
-# Преобразуем категориальные признаки
-X_train[cat_features] = X_train[cat_features].astype('category')
-X_test[cat_features] = X_test[cat_features].astype('category')
+def train_final_model(train_feat: pd.DataFrame):
+    X = train_feat.drop(columns=["id", "y", "sample_weight"], errors="ignore")
+    y = train_feat["y"]
+    sample_weight = train_feat.get("sample_weight", None)
 
-# Параметры модели
-params = {
-    'objective': 'binary',
-    'metric': 'binary_logloss',
-    'boosting_type': 'gbdt',
-    'num_leaves': 31,
-    'learning_rate': 0.05,
-    'feature_fraction': 0.8,
-    'bagging_fraction': 0.8,
-    'bagging_freq': 5,
-    'verbose': -1,
-}
-
-# Учёт дисбаланса через веса
-neg_weight = len(y_train[y_train == 0]) / len(y_train)
-pos_weight = len(y_train[y_train == 1]) / len(y_train)
-params['scale_pos_weight'] = neg_weight / pos_weight
-
-# Кросс-валидация
-cv = StratifiedKFold(n_splits=5, shuffle=False, random_state=None)  # Без перемешивания — учитываем временной порядок
-preds = np.zeros(len(X_test))
-f1_scores = []
-
-for tr_idx, val_idx in cv.split(X_train, y_train):
-    X_tr, X_val = X_train.iloc[tr_idx], X_train.iloc[val_idx]
-    y_tr, y_val = y_train.iloc[tr_idx], y_train.iloc[val_idx]
-
-    dtrain = lgb.Dataset(X_tr, label=y_tr, categorical_feature=cat_features)
-    dval = lgb.Dataset(X_val, label=y_val, reference=dtrain)
-
-    model = lgb.train(
-        params,
-        dtrain,
-        valid_sets=[dtrain, dval],
-        num_boost_round=1000,
-        callbacks=[
-            lgb.early_stopping(stopping_rounds=50, verbose=False),
-            lgb.log_evaluation(period=0)
-        ]
+    model = LGBMClassifier(
+        n_estimators=800,
+        learning_rate=0.03,
+        num_leaves=128,
+        subsample=0.9,
+        colsample_bytree=0.9,
+        class_weight="balanced",
+        random_state=42
     )
+    model.fit(X, y, sample_weight=sample_weight)
+    print("✅ Финальная модель обучена")
 
-    val_pred_proba = model.predict(X_val)
-    val_pred = (val_pred_proba > 0.5).astype(int)
-    f1 = f1_score(y_val, val_pred)
-    f1_scores.append(f1)
+    # --- Сохраняем важность признаков ---
+    importances = pd.DataFrame({
+        "feature": X.columns,
+        "importance": model.feature_importances_
+    }).sort_values("importance", ascending=False)
 
-print(f"Средний F1: {np.mean(f1_scores):.4f}")
-print(f"Стандартное отклонение: {np.std(f1_scores):.4f}")
+    importances.to_csv("feature_importances.csv", index=False)
+    print("📄 Важность признаков сохранена в feature_importances.csv")
 
-# Финальное предсказание на тесте
-final_model = lgb.train(
-    params,
-    lgb.Dataset(X_train, label=y_train, categorical_feature=cat_features),
-    num_boost_round=int(1.1 * 50),  # немного больше, чем average best iteration
-    callbacks=[lgb.log_evaluation(period=0)]
-)
+    # Строим график топ-20 признаков
+    plt.figure(figsize=(10, 8))
+    sns.barplot(data=importances.head(20), x="importance", y="feature", palette="viridis")
+    plt.title("Топ-20 признаков по важности (LightGBM)")
+    plt.tight_layout()
+    plt.savefig("feature_importances.png")
+    print("📊 График важности признаков сохранён в feature_importances.png")
 
-test_pred_proba = final_model.predict(X_test)
-y_pred = (test_pred_proba > 0.5).astype(int)
+    return model
 
-# Сохранение результата
-submission = pd.DataFrame({
-    'id': test_enc['id'],
-    'y': y_pred
-})
-submission.to_csv('../submissions/my_submission2.csv', index=False)
 
-print("Файл my_submission2.csv сохранён.")
-print(f"Распределение y в submission2:\n{submission['y'].value_counts().sort_index()}")
+
+def make_submission(model, test_feat: pd.DataFrame, filename="my_submission.csv"):
+    """
+    Формирует файл my_submission.csv с предсказаниями.
+    """
+    # Убираем все служебные колонки
+    X_test = test_feat.drop(columns=["id", "y", "sample_weight"], errors="ignore")
+
+    # Проверка: совпадают ли признаки с обучением
+    train_columns = model.feature_name_
+    X_test = X_test.reindex(columns=train_columns, fill_value=0)
+
+    preds = model.predict(X_test)
+    submission = pd.DataFrame({
+        "id": test_feat["id"],
+        "y": preds.astype(int)
+    })
+    submission.to_csv(filename, index=False)
+    print(f"📄 Файл {filename} сохранён")
+
+
+
+if __name__ == "__main__":
+    # Загружаем и формируем признаки
+    train_feat, test_feat = prepare_datasets()
+
+    # Валидация на временных сплитах
+    model = train_and_validate(train_feat, n_splits=5)
+
+    # Финальное обучение на всех данных
+    final_model = train_final_model(train_feat)
+
+    # Формируем my_submission.csv
+    make_submission(final_model, test_feat)

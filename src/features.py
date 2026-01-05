@@ -1,56 +1,72 @@
-import numpy as np
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import pandas as pd
+import numpy as np
+from sklearn.preprocessing import LabelEncoder
 
-def create_features(df):
+def make_features(df: pd.DataFrame, is_train=True) -> pd.DataFrame:
     """
-    Генерация признаков: циклическое кодирование, агрегаты x1-x12.
-    g1, g2 остаются в int для совместимости с time-aware encoding.
+    Функция подготовки признаков для модели.
+    Вход: датафрейм train или test.
+    Выход: датафрейм с новыми признаками.
     """
-    df = df.copy()
 
-    # Циклическое кодирование с периодом 12 (по паттерну)
-    period = 12
-    df['date_sin'] = np.sin(2 * np.pi * df['relative_date_number'] / period)
-    df['date_cos'] = np.cos(2 * np.pi * df['relative_date_number'] / period)
+    # --- Кодирование категориальных признаков ---
+    for col in ["g1", "g2"]:
+        le = LabelEncoder()
+        df[col] = le.fit_transform(df[col].astype(str))
 
-    # Суммарные признаки
-    x_cols = [f'x{i}' for i in range(1, 13)]
-    df['x_sum'] = df[x_cols].sum(axis=1)
-    df['x_nonzero'] = (df[x_cols] > 0).sum(axis=1)
+    # --- Временные признаки ---
+    # Нормализованная дата (от 0 до 1)
+    df["date_norm"] = df["relative_date_number"] / df["relative_date_number"].max()
+
+    # Индикаторы начала и конца периода
+    df["is_start_period"] = (df["relative_date_number"] <= 5).astype(int)
+    df["is_end_period"] = (df["relative_date_number"] >= df["relative_date_number"].max() - 5).astype(int)
+
+    # --- Инженерия признаков ---
+    # Взаимодействия между сильными признаками
+    df["x4_x12"] = df["x4"] * df["x12"]
+    df["x10_x12"] = df["x10"] * df["x12"]
+
+    # Индикаторы нулевых значений
+    for col in [f"x{i}" for i in range(1, 13)]:
+        df[f"{col}_is_zero"] = (df[col] == 0).astype(int)
+
+    # Логарифмирование для признаков с длинным хвостом
+    for col in ["x4", "x5", "x10", "x12"]:
+        df[f"{col}_log1p"] = np.log1p(df[col])
+
+    # --- Агрегаты по группам ---
+    # Среднее значение признаков внутри g1/g2
+    for col in ["g1", "g2"]:
+        for feat in [f"x{i}" for i in range(1, 13)]:
+            df[f"{feat}_mean_by_{col}"] = df.groupby(col)[feat].transform("mean")
+
+    # --- Балансировка классов (только для train) ---
+    if is_train and "y" in df.columns:
+        # Вес для каждого объекта: больше для редкого класса
+        df["sample_weight"] = df["y"].apply(lambda v: 5 if v == 1 else 1)
 
     return df
 
 
-def add_time_aware_target_encoding(train_df, test_df, cols, target='y', alpha=10.0):
+def prepare_datasets(train_path="../data/train.csv", test_path="../data/test.csv"):
     """
-    Time-aware Target Encoding: для каждой строки используем только прошлые значения.
-    Предотвращает утечку данных из будущего.
+    Загружает train и test, формирует признаки и возвращает готовые датафреймы.
     """
-    train_out = train_df.copy()
-    test_out = test_df.copy()
+    train = pd.read_csv(train_path)
+    test = pd.read_csv(test_path)
 
-    global_mean = train_df[target].mean()
+    train_feat = make_features(train, is_train=True)
+    test_feat = make_features(test, is_train=False)
 
-    # Сортируем трейн по времени
-    train_out = train_out.sort_values(by='relative_date_number').reset_index(drop=True)
+    print("✅ Признаки успешно сформированы")
+    print(f"Train shape: {train_feat.shape}, Test shape: {test_feat.shape}")
 
-    for col in cols:
-        # Накопленная сумма и счётчик до текущей строки (не включая её)
-        cumsum = train_out.groupby(col)[target].cumsum() - train_out[target]
-        cumcount = train_out.groupby(col).cumcount()
+    return train_feat, test_feat
 
-        # Сглаженное среднее: (sum + global_mean * alpha) / (count + alpha)
-        smooth_mean = (cumsum + global_mean * alpha) / (cumcount + alpha)
-        smooth_mean = smooth_mean.fillna(global_mean)  # для первой строки в группе
 
-        train_out[f'{col}_tenc'] = smooth_mean
-
-        # Для теста: используем всё train (уже безопасно, так как train до теста по времени)
-        encodings = train_out.groupby(col)[target].agg(['mean', 'count'])
-        encodings['smooth'] = (encodings['mean'] * encodings['count'] + global_mean * alpha) / (encodings['count'] + alpha)
-        test_out[f'{col}_tenc'] = test_out[col].map(encodings['smooth']).fillna(global_mean)
-
-    # Возвращаем в исходный порядок (если нужно)
-    train_out = train_out.sort_values(by='index').reset_index(drop=True)
-
-    return train_out, test_out
+if __name__ == "__main__":
+    train_feat, test_feat = prepare_datasets()
