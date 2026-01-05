@@ -1,0 +1,65 @@
+E:\programmersoft\ASTON\21_vek_test\.venv\Scripts\python.exe E:\programmersoft\ASTON\21_vek_test\src\train.py
+[100]	training's binary_logloss: 0.0188183	valid_1's binary_logloss: 0.0204356
+[200]	training's binary_logloss: 0.00726462	valid_1's binary_logloss: 0.00934921
+[300]	training's binary_logloss: 0.00394457	valid_1's binary_logloss: 0.00608726
+[400]	training's binary_logloss: 0.00237615	valid_1's binary_logloss: 0.00437378
+[500]	training's binary_logloss: 0.00145032	valid_1's binary_logloss: 0.00323601
+[600]	training's binary_logloss: 0.00089358	valid_1's binary_logloss: 0.00244972
+[700]	training's binary_logloss: 0.000586255	valid_1's binary_logloss: 0.00194542
+[800]	training's binary_logloss: 0.000375538	valid_1's binary_logloss: 0.00157303
+[900]	training's binary_logloss: 0.000237346	valid_1's binary_logloss: 0.00128577
+[1000]	training's binary_logloss: 0.000165045	valid_1's binary_logloss: 0.00112897
+F1 на фолде: 0.9966
+[100]	training's binary_logloss: 0.02045	valid_1's binary_logloss: 0.0232081
+[200]	training's binary_logloss: 0.00767155	valid_1's binary_logloss: 0.0102575
+[300]	training's binary_logloss: 0.00409888	valid_1's binary_logloss: 0.00644484
+[400]	training's binary_logloss: 0.00247376	valid_1's binary_logloss: 0.00448715
+[500]	training's binary_logloss: 0.00151871	valid_1's binary_logloss: 0.00331428
+[600]	training's binary_logloss: 0.00101739	valid_1's binary_logloss: 0.00267046
+[700]	training's binary_logloss: 0.000663732	valid_1's binary_logloss: 0.00208491
+[800]	training's binary_logloss: 0.000427241	valid_1's binary_logloss: 0.00164641
+[900]	training's binary_logloss: 0.000272983	valid_1's binary_logloss: 0.00132559
+[1000]	training's binary_logloss: 0.000183758	valid_1's binary_logloss: 0.00111386
+F1 на фолде: 0.9973
+[100]	training's binary_logloss: 0.0192673	valid_1's binary_logloss: 0.0198072
+[200]	training's binary_logloss: 0.00780623	valid_1's binary_logloss: 0.0093247
+[300]	training's binary_logloss: 0.00405759	valid_1's binary_logloss: 0.00572197
+[400]	training's binary_logloss: 0.00241104	valid_1's binary_logloss: 0.00394463
+[500]	training's binary_logloss: 0.00158187	valid_1's binary_logloss: 0.00303667
+[600]	training's binary_logloss: 0.00104002	valid_1's binary_logloss: 0.00234551
+[700]	training's binary_logloss: 0.000678481	valid_1's binary_logloss: 0.00185909
+[800]	training's binary_logloss: 0.000435621	valid_1's binary_logloss: 0.00148887
+[900]	training's binary_logloss: 0.000280042	valid_1's binary_logloss: 0.00118159
+[1000]	training's binary_logloss: 0.000182173	valid_1's binary_logloss: 0.000964112
+F1 на фолде: 0.9974
+[100]	training's binary_logloss: 0.0196057	valid_1's binary_logloss: 0.0207857
+[200]	training's binary_logloss: 0.00739041	valid_1's binary_logloss: 0.00906364
+[300]	training's binary_logloss: 0.00396158	valid_1's binary_logloss: 0.00571097
+[400]	training's binary_logloss: 0.00229328	valid_1's binary_logloss: 0.00387986
+[500]	training's binary_logloss: 0.00147005	valid_1's binary_logloss: 0.00299373
+[600]	training's binary_logloss: 0.000975588	valid_1's binary_logloss: 0.00238745
+[700]	training's binary_logloss: 0.000638851	valid_1's binary_logloss: 0.00191727
+[800]	training's binary_logloss: 0.000426195	valid_1's binary_logloss: 0.00160073
+[900]	training's binary_logloss: 0.000242579	valid_1's binary_logloss: 0.00122039
+[1000]	training's binary_logloss: 0.000165277	valid_1's binary_logloss: 0.00107069
+F1 на фолде: 0.9962
+[100]	training's binary_logloss: 0.0190176	valid_1's binary_logloss: 0.0211125
+[200]	training's binary_logloss: 0.00663513	valid_1's binary_logloss: 0.00856569
+[300]	training's binary_logloss: 0.00352877	valid_1's binary_logloss: 0.00539135
+[400]	training's binary_logloss: 0.00200453	valid_1's binary_logloss: 0.0036544
+[500]	training's binary_logloss: 0.00127418	valid_1's binary_logloss: 0.00283724
+[600]	training's binary_logloss: 0.00084132	valid_1's binary_logloss: 0.00227695
+[700]	training's binary_logloss: 0.000526554	valid_1's binary_logloss: 0.00179815
+[800]	training's binary_logloss: 0.000339529	valid_1's binary_logloss: 0.00146618
+[900]	training's binary_logloss: 0.000210709	valid_1's binary_logloss: 0.00117318
+[1000]	training's binary_logloss: 0.000143643	valid_1's binary_logloss: 0.00104126
+F1 на фолде: 0.9973
+Средний F1 на кросс-валидации: 0.9969
+Стандартное отклонение F1: 0.0005
+Файл my_submission.csv успешно сохранён!
+Распределение предсказаний:
+0    242090
+1     20515
+Name: count, dtype: int64
+
+Process finished with exit code 0
