@@ -8,7 +8,7 @@ plt.style.use('seaborn-v0_8')
 sns.set_palette("husl")
 
 # Загрузка файлов
-submission = pd.read_csv('../submissions/my_submission.csv')
+submission = pd.read_csv('../submissions/my_submission2.csv')
 sample = pd.read_csv('../submissions/sample_submission.csv')
 test_data = pd.read_csv('../data/test.csv')
 

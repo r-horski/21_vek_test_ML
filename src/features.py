@@ -1,10 +1,10 @@
 import numpy as np
-from sklearn.model_selection import KFold
+import pandas as pd
 
 def create_features(df):
     """
     Генерация признаков: циклическое кодирование, агрегаты x1-x12.
-    g1, g2 остаются в исходном типе (int) для корректной работы Target Encoding.
+    g1, g2 остаются в int для совместимости с time-aware encoding.
     """
     df = df.copy()
 
@@ -21,35 +21,36 @@ def create_features(df):
     return df
 
 
-def add_target_encoding(train_df, test_df, cols, target='y', alpha=10.0):
+def add_time_aware_target_encoding(train_df, test_df, cols, target='y', alpha=10.0):
     """
-    Сглаженное Target Encoding с кросс-валидацией на train, применение к test.
-    alpha — сила сглаживания.
+    Time-aware Target Encoding: для каждой строки используем только прошлые значения.
+    Предотвращает утечку данных из будущего.
     """
     train_out = train_df.copy()
     test_out = test_df.copy()
 
     global_mean = train_df[target].mean()
 
-    # Обработка теста
+    # Сортируем трейн по времени
+    train_out = train_out.sort_values(by='relative_date_number').reset_index(drop=True)
+
     for col in cols:
-        encodings = train_df.groupby(col)[target].agg(['mean', 'count'])
-        encodings['smooth'] = (
-            encodings['mean'] * encodings['count'] + global_mean * alpha
-        ) / (encodings['count'] + alpha)
+        # Накопленная сумма и счётчик до текущей строки (не включая её)
+        cumsum = train_out.groupby(col)[target].cumsum() - train_out[target]
+        cumcount = train_out.groupby(col).cumcount()
+
+        # Сглаженное среднее: (sum + global_mean * alpha) / (count + alpha)
+        smooth_mean = (cumsum + global_mean * alpha) / (cumcount + alpha)
+        smooth_mean = smooth_mean.fillna(global_mean)  # для первой строки в группе
+
+        train_out[f'{col}_tenc'] = smooth_mean
+
+        # Для теста: используем всё train (уже безопасно, так как train до теста по времени)
+        encodings = train_out.groupby(col)[target].agg(['mean', 'count'])
+        encodings['smooth'] = (encodings['mean'] * encodings['count'] + global_mean * alpha) / (encodings['count'] + alpha)
         test_out[f'{col}_tenc'] = test_out[col].map(encodings['smooth']).fillna(global_mean)
 
-    # Обработка трейна (out-of-fold)
-    for col in cols:
-        train_out[f'{col}_tenc'] = 0.0
-        kf = KFold(n_splits=5, shuffle=True, random_state=42)
-        for tr_idx, val_idx in kf.split(train_df):
-            tr, val = train_df.iloc[tr_idx], train_df.iloc[val_idx]
-            encodings = tr.groupby(col)[target].agg(['mean', 'count'])
-            encodings['smooth'] = (
-                encodings['mean'] * encodings['count'] + global_mean * alpha
-            ) / (encodings['count'] + alpha)
-            val_encoded = val[col].map(encodings['smooth']).fillna(global_mean)
-            train_out.loc[val_idx, f'{col}_tenc'] = val_encoded
+    # Возвращаем в исходный порядок (если нужно)
+    train_out = train_out.sort_values(by='index').reset_index(drop=True)
 
     return train_out, test_out
